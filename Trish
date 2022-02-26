@@ -1,0 +1,288 @@
+#install library
+install.packages('downloader')
+install.packages('foreign')
+install.packages('dplyr')
+install.packages('srvyr')
+install.packages('stringr')
+install.packages("ggplot2")
+
+#use the library 
+library(foreign) #Imports dta files
+library(dplyr) #Data manipulation
+library(downloader) #Downloads files from the internet
+library(srvyr) #Survey
+library(stringr) #Manipulate
+library(ggplot2) #graph the data 
+
+#download the data 
+##household data 
+url_household='http://www.ennvih-mxfls.org/english/assets/hh02dta_bc.zip'
+hd_name='hh02dta_bc.zip'
+download.file(url_household,hd_name)
+unzip(hd_name)
+
+##weight
+url_weight='http://www.ennvih-mxfls.org/english/assets/hh02w_bc.zip'
+weight_name='hh02w_bc.zip'
+download.file(url_weight,weight_name)
+unzip(weight_name)
+
+#import data —— read
+hd_ls='hh02dta_bc/c_ls.dta'
+hd_cv='hh02dta_bc/c_cv.dta'
+hd_cvo='hh02dta_bc/c_cvo.dta'
+weight_file='hh02w_bc.dta'
+
+ls=read.dta(hd_ls)
+cv=read.dta(hd_cv)
+cvo=read.dta(hd_cvo)
+weight=read.dta(weight_file)
+
+#mutate create a new column
+df_wt = weight %>% 
+  mutate(folio = str_replace(folio, "^0+" ,"")) 
+ls=ls %>% 
+  mutate(folio = str_replace(folio, "^0+" ,"")) 
+cv=cv %>% 
+  mutate(folio = str_replace(folio, "^0+" ,"")) 
+cvo=cvo %>% 
+  mutate(folio = str_replace(folio, "^0+" ,"")) 
+
+
+#Provide a table of means and standard deviations of the following variables
+#1) count household size 
+df_hdsize=ls %>% 
+  select(ls,folio) %>% 
+  group_by(folio) %>% 
+  count()
+
+df_hdsize %>% 
+  head(2)
+
+df_hdsize=df_hdsize %>% 
+  rename('family_members'='n')
+
+#regulate mean(un-weighted mean)
+df_hdsize %>% 
+  select(family_members) %>% 
+  summary()
+
+df_hdsize %>% 
+  summarise(hdsize_mean=mean(family_members),
+            hdsize_sd=sd(family_members))
+
+#add weight
+df_hdsize=merge(df_hdsize,df_wt,by=c('folio'))
+
+df_hdsize %>% 
+  as_survey(weights=fac_libc) %>% 
+  summarise(hdsize_mean=survey_mean(family_members),
+            hd_size_sd=survey_sd(family_members))
+
+# 2)number of children under 18 in a household 
+df_children=ls %>% 
+  filter(ls02_2<18) %>% 
+  group_by(folio) %>% 
+  count()
+
+df_children=merge(df_children,df_wt,by=c('folio'))
+
+df_children=df_children %>% 
+  rename('under_18'='n')
+
+#regular mean (un-weighted mean)
+df_children %>% 
+  summarize(under18_mean=mean(under_18),
+            under18_sd=sd(under_18))
+
+#weighted mean
+df_children %>% 
+  as_survey(weights=fac_libc) %>% 
+  summarise(under18_mean=survey_mean(under_18),
+            under18_sd=survey_sd(under_18))
+
+#3)proportion of households with a toilet,(cv16 )
+df_toilet=cv %>% 
+  select(folio,cv16) 
+
+df_toilet %>% 
+  select(cv16) %>% 
+  unique()
+
+df_toilet=df_toilet %>% 
+  mutate(toilet=as.numeric(cv16==1))
+
+#remove NA
+df_toilet %>% 
+  select(toilet) %>% 
+  summary()
+
+#regular mean 
+df_toilet %>% 
+  filter(toilet != 'NA') %>% 
+  summarize(toilet_mean = mean(toilet),
+            toilet_sd=sd(toilet))
+
+#weighted mean
+df_toilet=merge(df_toilet,df_wt,by=c('folio'))
+
+df_toilet %>% 
+  filter(toilet != 'NA') %>% 
+  as_survey(weights=fac_libc) %>% 
+  summarize(toilet_mean =survey_mean(toilet),
+            toilet_sd=survey_sd(toilet))
+
+#4)proportion of households with a separate room for cooking,(cv05)
+df_cooking=cv %>% 
+  select(cv05,folio) %>% 
+  mutate(cooking=as.numeric(cv05==1))
+
+df_cooking %>% 
+  select(cv05) %>% 
+  summary()
+
+#regular mean 
+df_cooking %>% 
+  summarize(cooking_mean = mean(cooking),
+            cooking_sd=sd(cooking))
+
+#weighted mean
+df_cooking=merge(df_cooking,df_wt,by=c('folio'))
+
+df_cooking %>% 
+  as_survey(weights=fac_libc) %>% 
+  summarize(cooking_mean =survey_mean(cooking),
+            cooking_sd=survey_sd(cooking))
+
+#5)the proportion of households with a telephone and (cv01_1)d 
+#proportion with a dirt (soil) floor. (cvo05_1)
+#telephone
+df_telephone=cv %>% 
+  select(cv01_1,folio) %>% 
+  rename('telephone'='cv01_1') 
+
+df_telephone=df_telephone%>% 
+  mutate(telephone=as.numeric(telephone==1))
+
+#unweighted mean
+df_telephone %>% 
+  filter(telephone != 'NA') %>% 
+  summarize(telephone_mean = mean(telephone),
+            telephone_sd=sd(telephone))
+#add weight 
+df_telephone=merge(df_telephone,df_wt,by=c('folio'))
+
+#weighted mean
+df_telephone %>% 
+  filter(telephone != 'NA') %>% 
+  as_survey(weights=fac_libc) %>% 
+  summarize(telephone_mean =survey_mean(telephone),
+            telephone_sd=survey_sd(telephone))
+
+#floor
+df_floor=cvo %>% 
+  select(cvo05_1,folio) %>% 
+  rename('floor'='cvo05_1') 
+
+df_floor=df_floor %>% 
+  mutate(floor=as.numeric(floor==3))
+
+df_floor%>% 
+  filter(floor != 'NA') %>% 
+  summarize(floor_mean = mean(floor),
+            floor_sd=sd(floor))
+
+#add weight 
+df_floor=merge(df_floor,df_wt,by=c('folio'))
+
+#weighted
+df_floor %>% 
+  filter(floor != 'NA') %>% 
+  as_survey(weights=fac_libc) %>% 
+  summarize(floor_mean =survey_mean(floor),
+            floor_sd=survey_sd(floor))
+
+
+#3 the characteristics of the (declared) head of the household.
+##a table of means and standard deviations (summary) 
+
+#1) Age（average age,ls02_2）
+# find the HH head(ls05_1)
+df_HH=ls %>% 
+  select(ls02_2,ls05_1,folio) %>% 
+  rename('age'='ls02_2')
+
+df_HH %>% 
+  filter(ls05_1==1) %>% 
+  filter(age != 'NA') %>% 
+  summarize(age_mean=mean(age),
+            age_sd=sd(age))
+
+#2)proportion who have completed primary school (six grades)
+df_education=ls%>% 
+  select(folio,ls05_1,ls15_1,ls14) %>% 
+  rename('grade'='ls14') 
+
+df_education=df_education %>% 
+  filter(grade !='98') %>% 
+  mutate(grade_6=as.numeric(grade>2)) 
+  
+df_education %>% 
+  filter(ls05_1 == 1) %>% 
+  filter(grade_6!='NA') %>% 
+  summarize(grade_6_mean=mean(grade_6),
+            grade_6_sd=sd(grade_6))
+  
+  
+#3）proportion who are working or contributing to HH expenditure.（ls13_1）
+df_working=ls %>% 
+  select(folio,ls12,ls05_1,) %>% 
+  mutate(work=as.numeric(ls12==1))  
+
+df_working %>% 
+  filter(work != 'NA') %>% 
+  filter(ls05_1==1) %>%
+  summarize(work_mean=mean(work),
+            work_sd=sd(work))
+
+
+#4.the characteristics of children in the household between the ages of 6 and 18
+#select data
+df_children=ls %>% 
+  select(folio,ls16,ls12,ls02_2) %>% 
+  mutate(attendance=as.numeric(ls16==1)) %>% 
+  mutate(working=as.numeric(ls12==1)) 
+
+#1)attend school by age 
+barplot_data=df_children %>% 
+  filter(ls02_2>5) %>% 
+  filter(ls02_2<19) %>% 
+  filter(attendance!='NA') %>% 
+  group_by(ls02_2) %>% 
+  summarize(attendance_mean=mean(attendance)*100) %>% 
+  round(2)
+
+barplot_data%>% 
+  ggplot(aes(x=ls02_2, y=attendance_mean)) + geom_bar(stat="identity", width=.5, fill='red',color='blue') +
+  xlab('age') + 
+  ylab('proportion') + 
+  ggtitle('The proportion of children who report working') +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+
+## 2) report working by age
+barplot_working=df_children %>% 
+  filter(ls02_2>5) %>% 
+  filter(ls02_2<19) %>% 
+  filter(working!='NA') %>% 
+  group_by(ls02_2) %>% 
+  summarize(working_mean=mean(working)*100)
+
+#graph
+barplot_working%>% 
+  ggplot(aes(x=ls02_2, y=working_mean)) + geom_bar(stat="identity", width=.5, fill='red',color='blue') +
+  xlab('age') + 
+  ylab('proportion') + 
+  ggtitle('The proportion of children who report working') +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.text.x=element_text(angle=45, hjust=1))
