@@ -1,0 +1,224 @@
+# install packages
+install.packages('downloader')
+install.packages('dplyr')
+install.packages('ggplot2')
+
+library(foreign) #Imports dta files
+library(dplyr) #Data manipulation
+library(ggplot2) #Visulaize data
+
+## install data
+#URL 
+url = "http://www.ennvih-mxfls.org/english/assets/hh02dta_b1.zip"
+#File name
+file_name = "mxfls_cons.zip"
+# "Downloader" library--function: download.file()
+download.file(url, file_name)
+#Unzip file
+unzip("mxfls_cons.zip")
+
+#another data set 
+url_house  = 'http://www.ennvih-mxfls.org/english/assets/hh02dta_bc.zip'
+file_name = "mxfls_house.zip"
+download.file(url_house, file_name)
+unzip(file_name)
+
+#Import file into R
+df_consumption1= read.dta("hh02dta_b1/i_cs.dta")
+df_consumption2= read.dta("hh02dta_b1/i_cs1.dta")
+
+
+# 1. Calculate a measure of total consumption and per capita consumption for each household in the 2002 round
+
+## 1.1 Grab consumption data of diffreent products for month, week, 3 month 
+## 1.1.1 Weekly data
+df_week = df_consumption1 %>% 
+  select(contains('cs02') & ends_with('2') | 'folio') 
+
+df_week %>% 
+  names()
+
+#convert weekly data to monthly data
+df_week = df_week %>% 
+  mutate_at(vars(cs02a_12:cs02e_32), ~ . *4.3)
+
+df_week %>% 
+  head(2)
+
+## 1.1.2 Monthly data
+df_month=df_consumption1 %>% 
+  select(contains('cs16') & ends_with('2') | 'folio')
+
+df_month %>% 
+  head(4)
+
+## 1.1.3 Three month data
+df_three_mon = df_consumption2 %>% 
+  select(contains('cs22') & ends_with('2') | 'folio') 
+
+df_three_mon %>% 
+  head(3)
+
+# 1.1.3.1 Convert data to monthly
+df_three_mon  %>% 
+  names()
+
+df_three_mon = df_three_mon %>% 
+  mutate_at(vars(cs22a_2:cs22h_2), ~ . *1/3)
+
+df_three_mon  %>% 
+  head(2)
+
+### 1.1.4 Merge all data
+df_cons_all = merge(df_week,df_month, by = 'folio')
+df_cons_all = merge(df_cons_all, df_three_mon, by ='folio')
+
+### 1.1.5 Sum row data
+### 1.1.5.1 Replace na with zero
+df_cons_all = df_cons_all %>% 
+  replace(is.na(.), 0)
+
+df_cons_all %>% 
+  summary()
+
+#Sum all row data together to get total consumption except for folio
+df_cons_all = df_cons_all %>% 
+  select(-folio)%>% 
+  mutate(total_cons = rowSums(.)
+  ) %>% 
+  cbind(df_cons_all %>% select(folio))
+
+df_cons_all %>% 
+  head(2)
+
+
+### 1.2 Count family members
+#### 1.2.1 Download data
+#Import file into R
+df_ind= read.dta("hh02dta_bc/c_ls.dta")
+
+df_ind %>% 
+  head(2)
+
+df_familysize=df_ind %>% 
+  select("folio"|"ls") %>% 
+  group_by(folio) %>% 
+  count()
+
+#delete data set
+rm(df_ind)
+
+
+### 1.3 Calculate per capita consumption
+#Merge homesize with total cons
+df_cons_all = merge(df_cons_all, df_familysize, by ='folio')
+
+df_cons_all %>% 
+  head(2)
+
+df_cons_all= df_cons_all %>% 
+  rename('familymember'='n')
+
+df_cons_all = df_cons_all %>% 
+  select(folio, total_cons, familymember)
+
+df_cons_all=df_cons_all %>% 
+  mutate(per_captial_con=total_cons/familymember) 
+
+#END of Q1
+
+
+# 2. Calculate the set of poverty rates nationwide for the head count and average poverty gap, average poverty gap squared. Assume the poverty line=500 pesos per person.  
+# Provide poverty rates based on household consumption per capita.
+povertyline = 500 #saved object
+
+#2.1.poverty rates nationwide for the head count
+df_cons_all = df_cons_all %>% 
+  mutate(pov_dummy = as.numeric(per_captial_con < povertyline))
+
+df_cons_all= df_cons_all%>% 
+  mutate(pov_people=pov_dummy*familymember)
+
+df_cons_all %>% 
+  summarise(sum(pov_people)/sum(familymember)
+             )
+
+#2.2.calculate average poverty gap
+total_people = sum(df_cons_all$familymember)
+total_people
+
+#average poevry gap—— total individual poverty gap ratio / total povery poeple 
+df_cons_all%>%
+  filter(pov_dummy==1) %>% 
+  mutate(family_pov_gap = (povertyline - per_captial_con)/povertyline) %>% 
+  summarise(sum(family_pov_gap*pov_people)/total_people)
+
+#2.3.calculate average poverty gap squared
+df_cons_all%>%
+  filter(pov_dummy==1) %>% 
+  mutate(family_pov_gap = (povertyline - per_captial_con)/povertyline) %>% 
+  summarise(sum((family_pov_gap*pov_people)^2)/total_people)
+
+#END OF Q2
+
+# 3. Repeat 2) by area of residence. 
+#How does the poverty rate change by rural/urban residence?   
+#What can you say about the severity of poverty in rural versus urban areas?
+
+## 3.1 Import estrato data
+df_region = read.dta("hh02dta_bc/c_portad.dta")
+df_region = df_region %>% 
+  select(folio, estrato)
+
+#merge data together 
+df_cons_all = merge(df_region, df_cons_all, by ='folio')
+
+df_cons_all %>% 
+  head(3)
+
+#estrato=1，2，3 is urban area
+#estrato=4， is rural area
+df_cons_all=df_cons_all %>% 
+  mutate(dummy_urban=as.numeric(estrato==1|estrato==2|estrato==3),
+         dummy_rural=as.numeric(estrato==4)) 
+
+#3.1.1 poverty rates nationwide for the head count by area:
+df_cons_all %>% 
+  group_by(dummy_urban) %>% 
+  summarise(sum(pov_people)/sum(familymember))
+
+df_cons_all %>% 
+  group_by(dummy_rural) %>% 
+  summarise(sum(pov_people)/sum(familymember))
+
+#3.1.2 calculate average poverty gap by area:
+#urban area
+df_cons_all%>%
+  filter(pov_dummy==1) %>% 
+  group_by(dummy_urban) %>% 
+  mutate(family_pov_gap = (povertyline - per_captial_con)/povertyline) %>% 
+  summarise(sum(family_pov_gap*pov_people)/total_people)
+
+#rural area
+df_cons_all%>%
+  filter(pov_dummy==1) %>% 
+  group_by(dummy_rural) %>% 
+  mutate(family_pov_gap = (povertyline - per_captial_con)/povertyline) %>% 
+  summarise(sum(family_pov_gap*pov_people)/total_people)
+
+#3.1.3 calculate average poverty gap squared by area:
+#urban area
+df_cons_all%>%
+  filter(pov_dummy==1) %>% 
+  group_by(dummy_urban) %>% 
+  mutate(family_pov_gap = (povertyline - per_captial_con)/povertyline) %>% 
+  summarise(sum((family_pov_gap*pov_people)^2)/total_people)
+
+#rural area
+df_cons_all%>%
+  filter(pov_dummy==1) %>% 
+  group_by(dummy_rural) %>% 
+  mutate(family_pov_gap = (povertyline - per_captial_con)/povertyline) %>% 
+  summarise(sum((family_pov_gap*pov_people)^2)/total_people)
+
+#END OF Q3
