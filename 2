@@ -157,7 +157,7 @@ df_cons_all%>%
 df_cons_all%>%
   filter(pov_dummy==1) %>% 
   mutate(family_pov_gap = (povertyline - per_captial_con)/povertyline) %>% 
-  summarise(sum((family_pov_gap*pov_people)^2)/total_people)
+  summarise(sum((family_pov_gap)^2*pov_people)/total_people)
 
 #END OF Q2
 
@@ -220,13 +220,13 @@ df_cons_all%>%
   filter(pov_dummy==1) %>% 
   group_by(dummy_urban) %>% 
   mutate(family_pov_gap = (povertyline - per_captial_con)/povertyline) %>% 
-  summarise(sum((family_pov_gap*pov_people)^2)/urban_people)
+  summarise(sum((family_pov_gap)^2*pov_people)/urban_people)
 
 #rural area
 df_cons_all%>%
   filter(pov_dummy==1) %>% 
   group_by(dummy_rural) %>% 
   mutate(family_pov_gap = (povertyline - per_captial_con)/povertyline) %>% 
-  summarise(sum((family_pov_gap*pov_people)^2)/rural_people)
+  summarise(sum((family_pov_gap)^2*pov_people)/rural_people)
 
 #END OF Q3
