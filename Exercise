@@ -1,0 +1,186 @@
+# DATA:
+# Data set: http://www.ennvih-mxfls.org/english/assets/hh02dta_b3a.zip
+
+#CODE BOOK:http://www.ennvih-mxfls.org/english/assets/hh02cb_bc.pdf
+
+## A.1 Download and install load packages
+install.packages('downloader')
+install.packages('foreign')
+install.packages('dplyr')
+install.packages('srvyr')
+install.packages('stringr')
+
+library(foreign) #Imports dta files
+library(dplyr) #Data manipulation
+library(downloader) #Downloads files from the internet
+library(srvyr) #Survey
+library(stringr) #Manipulate
+
+## B.Download files
+## B.1 Download
+url = "http://www.ennvih-mxfls.org/english/assets/hh02dta_b3a.zip"
+
+file_name = "mxflx_house_char.zip"
+
+download.file(url, file_name)
+
+unzip("mxflx_house_char.zip")
+
+# C.1 Solve questions
+# 1. Labor market participation rate
+## 1.1 What is the labor market participation rate of men versus women aged 16 to 65?
+##Import data 
+#market participation——TB02——1
+df_lmp = read.dta("hh02dta_b3a/iiia_tb.dta")
+#age data——iiia_portad——edad
+df_age = read.dta("hh02dta_b3a/iiia_portad.dta") 
+#gender data——hm16
+df_gender = read.dta("hh02dta_b3a/iiia_hm.dta") 
+
+# Create dummy for people who is working
+df_lmp %>% 
+  select(tb02_1) %>% 
+  unique()
+
+df_lmp=df_lmp %>% 
+  mutate(work_dummy = as.numeric(tb02_1==1))
+
+# create dummy for gender
+df_gender %>% 
+  select(hm16) %>% 
+  unique()
+
+df_gender=df_gender %>% 
+  mutate(gender_male = as.numeric(hm16==1))
+
+df_gender %>% 
+  names()
+
+#merge data
+df = merge(df_age, df_lmp, by = c('folio','ls'))
+df = merge(df, df_gender, by = c('folio','ls'))
+
+df = df %>% 
+  rename('age'  = 'edad' )
+
+df %>% 
+  names()
+
+### 1.1.1 Calculate participation age 16 to 65
+df %>% 
+  filter(age>15&age<66) %>% #Filter age
+  filter(work_dummy!='NA') %>% #Filter nas
+  group_by(gender_male) %>% #use hm16 column
+  summarise(male_rate=mean(work_dummy)) # Use labor market dummy
+
+
+### 1.2 What is the labor market participation of indigenous versus non indigenous individuals aged 16 to 65? 
+# Hint: (Use the variable ED03 to define who is indigenous.)
+#import data——indigenous——iiia_ed——ED03
+df_indigenous= read.dta("hh02dta_b3a/iiia_ed.dta")
+
+#define indigenous
+df_indigenous=df_indigenous %>% 
+  mutate(indigenous= as.numeric(ed03==1))
+
+df_indigenous %>% 
+  names()
+
+# Merge
+df1.2= merge(df_lmp,df_age, by = c('folio','ls'))
+df1.2= merge(df1.2,df_indigenous, by = c('folio','ls'))
+
+df1.2 = df1.2 %>% 
+  rename('age'  = 'edad' )
+
+df1.2 %>% 
+  filter(age>15 & age<66) %>% #Filter age
+  filter(work_dummy!='NA') %>% #Filter nas
+  group_by(indigenous) %>% 
+  summarise(male_rate=mean(work_dummy)) # Use labor market dummy
+
+# 2. Earnings and Hours worked: Main Job only
+## 2.1 Construct the following variables: 
+# total earnings in the previous month (TB35A_2), 
+# hours worked per week (TB27), 
+# weeks worked last year (TB29).
+
+# 2.1.1 total earnings in the previous month (TB35A_2), 
+df_wage = df_lmp%>%
+select(folio,ls, tb35a_2) %>% 
+  rename('total_earnings' = 'tb35a_2' )
+
+#2.1.2 hours worked per week (TB27), weeks worked last year (TB29).
+df_workhours= df_lmp %>% 
+  select(folio,ls,tb27s,tb29_p1)%>% 
+  rename('hrs_week' = 'tb27s' ,'weeks/year' = 'tb29_p1' )
+
+df_workhours= df_workhours %>% 
+  mutate(hrs_month=hrs_week*4.3)
+
+#2.2 Construct levels of schooling for all in the sample using the question Ed06.
+## create variables :levels of schooling 
+df_ed=df_indigenous %>% 
+  mutate(edu_primary_less = as.numeric(ed06==2,ed06==3),
+         edu_secondary = as.numeric(ed06==4,ed06==5),
+         edu_senior_above= as.numeric(ed06>5 & ed06<11))
+
+# Remove na values and select only certain columns
+df_ed = df_ed %>% 
+  select(folio, ls, edu_primary_less, edu_secondary,edu_senior_above) %>% 
+  na.omit()
+
+df_ed %>% 
+  summary()
+
+
+# 3.1 What are the average and median labor market earnings for women and men in the previous month from their main job?
+#merge workhours and wage with df
+df_wage1=merge(df_wage,df_gender, by =c('folio','ls'))
+
+# calculate
+df_wage1 %>% 
+  filter(total_earnings!='NA') %>% # filter na
+  group_by(gender_male) %>% # group by gender 
+  summarise(wage_mean = mean(total_earnings),
+            wage_median = median(total_earnings))
+
+# 3.2 2.What are the average and median labor market earnings for indigenous and non-indigenous individuals in the previous month from their main job?
+
+df_wage2=merge(df_wage,df_indigenous, by =c('folio','ls'))
+
+df_wage2 %>% 
+  filter(total_earnings!='NA') %>% # filter na
+  group_by(indigenous) %>% # group by gender 
+  summarise(wage_mean = mean(total_earnings),
+            wage_median = median(total_earnings))
+
+#4.1Carry out a regression of 
+#earnings per hour as a function of 
+#age, education, gender and indigenous status.
+
+# merge chart
+df_wage3=merge(df_wage,df_workhours,by =c('folio','ls'))
+
+df_wage3=df_wage3%>% 
+  mutate(earning_hrs=total_earnings/hrs_month)
+
+df_wage3%>% 
+  select(earning_hrs) %>% 
+  unique()
+
+df_final=merge(df, df_indigenous,by =c('folio','ls'))
+df_final=merge(df_final, df_wage3,by =c('folio','ls'))
+df_final=merge(df_final, df_ed,by =c('folio','ls'))
+
+# regression: edu_secondary,gender_male,age,earning_hrs,indigenous
+reg = df_final %>% 
+  select(edu_secondary,gender_male,age,earning_hrs,indigenous) %>% 
+  filter(is.finite(earning_hrs)) # Get rid of inifite values
+
+lm (earning_hrs ~ edu_secondary, data=reg)
+
+output=lm (earning_hrs ~ age+indigenous+gender_male+edu_secondary, data=reg)
+summary(output)
+
+
