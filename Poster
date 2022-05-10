@@ -1,0 +1,162 @@
+# DATA:
+# Data set: 
+#IFLS1 
+#BOOK1-HOUSEHOLD COMSUMPTION :https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS1-RR/data/stata/hh93b1.zip
+#BOOK2-HOUSEHOLD ECONOMY:https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS1-RR/data/stata/hh93b2.zip
+#BOOK5-HOUSEHOLD KIDS :https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS1-RR/data/stata/hh93b5.zip
+#CODE BOOK:https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS1-RR/doc/DRU1195_4.zip
+
+#IFLS2
+#BOOK1-HOUSEHOLD COMSUMPTION:https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS2/data/stata/hh97b1.zip
+#BOOK2-HOUSEHOLD ECONOMY:https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS2/data/stata/hh97b2.zip
+#BOOK5-HOUSEHOLD KIDS:https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS2/data/stata/hh97b5.zip
+#CODE BOOK:https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS2/doc/volume5.zip
+
+
+## A.1 Download and install load packages
+install.packages('downloader')
+install.packages('foreign')
+install.packages('dplyr')
+install.packages('srvyr')
+install.packages('stringr')
+
+library(foreign) #Imports dta files
+library(dplyr) #Data manipulation
+library(downloader) #Downloads files from the internet
+library(srvyr) #Survey
+library(stringr) #Manipulate
+
+## B.Download files
+## B.1 Download
+
+#IFLS1-BOOK1
+url1 = "https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS1-RR/data/stata/hh93b1.zip"
+file_name = "hh93b1.zip"
+download.file(url1, file_name)
+unzip("hh93b1.zip")
+
+#IFLS1-BOOK2
+url2="https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS1-RR/data/stata/hh93b2.zip"
+file_name = "hh93b2.zip"
+download.file(url2, file_name)
+unzip("hh93b2.zip")
+
+#IFLS1-BOOK5
+url3="https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS1-RR/data/stata/hh93b5.zip"
+file_name = "hh93b5.zip"
+download.file(url3, file_name)
+unzip("hh93b5.zip")
+
+#IFLS1-BOOKCA
+url4="https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS1-RR/data/stata/hh93bca.zip"
+file_name = "hh93bca.zip"
+download.file(url4, file_name)
+unzip("hh93bca.zip")
+
+
+
+#IFLS2-BOOK1:
+url_2.1='https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS2/data/stata/hh97b1.zip'
+file_name = "hh97b1.zip"
+download.file(url_2.1, file_name)
+unzip("hh97b1.zip")
+
+url_2.2='https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS2/data/stata/hh97b2.zip'
+file_name = "hh97b2.zip"
+download.file(url_2.2, file_name)
+unzip("hh97b2.zip")
+
+url_2.5='https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS2/data/stata/hh97b5.zip'
+file_name = "hh97b5.zip"
+download.file(url_2.5, file_name)
+unzip("hh97b5.zip")
+
+#IMPORT DATA IFLS1-BOOKCA,1-2,5
+
+#HH Gender & -BUKCCA1-CA05
+df_inf= read.dta("IFLS1/BOOKCA/bukcca2.dta")
+
+df_inf %>% 
+  summary()
+  
+#FAMILY EARNING——BUK2PH2-PH09r1(household income last year) 
+df_Tincome = read.dta("IFLS1/BOOK2/buk2ph2.dta")
+
+df_Tincome %>% 
+  summary()
+
+
+#CHILDREN EDUCATION—— BUK5DL1-DLA04-if children is in the school now?as
+df_edu = read.dta("IFLS1/BOOK5/buk5dl1.dta") 
+
+df_edu %>% 
+  summary()
+  
+  
+  
+
+#IMPORT DATA IFLS2
+
+#HH Gender & -BUKCCA1-CA05
+df_inf= read.dta("IFLS1/BOOKCA/bukcca2.dta")
+
+df_inf %>% 
+  summary()
+  
+#FAMILY EARNING——BUK2PH2-PH09r1(household income last year) 
+df_Tincome = read.dta("IFLS1/BOOK2/buk2ph2.dta")
+
+df_Tincome %>% 
+  summary()
+
+
+#CHILDREN EDUCATION—— BUK5DL1-DLA04-if children is in the school now?
+df_edu = read.dta("IFLS1/BOOK5/buk5dl1.dta") 
+
+df_edu %>% 
+  summary()
+  
+
+
+
+
+
+
+
+
+#merge data frame
+df_total=merge(df_edu, df_inf, by='case')
+  
+df_total=merge(df_total, df_Tincome, by='case')
+
+df_total= df_total %>% 
+  rename('school_attendance'='dla04',
+         'household_income'='ph09r1',
+         'gender'='ca05')
+
+#form new data frame
+df_total2=df_total %>% 
+  select(school_attendance, household_income, case, gender)
+
+df_total2 %>% 
+  summary()
+
+#Replace na with zero
+df_total2 = df_total2 %>% 
+  replace(is.na(.), 0)
+
+df_total2 %>% 
+  summarise(attendance_rate=mean(school_attendance))
+
+df_total2 %>% 
+  group_by(gender) %>% 
+  summarise(attendance_rate=mean(school_attendance))
+
+# regression: 
+lm (school_attendance ~ household_income, data=df_total2)
+
+output=lm (school_attendance ~ household_income, data=df_total2)
+summary(output)
+
+
+
