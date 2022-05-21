@@ -1,0 +1,349 @@
+##1993-1994 Data Code:
+# DATA:
+# Data set: 
+#IFLS1 
+#BOOKK-AREA,HH MEMBER: https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS1-RR/data/stata/hh93bk.zip
+#BOOK1-HOUSEHOLD COMSUMPTION :https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS1-RR/data/stata/hh93b1.zip
+#BOOK2-HOUSEHOLD ECONOMY:https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS1-RR/data/stata/hh93b2.zip
+#BOOK5-HOUSEHOLD KIDS :https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS1-RR/data/stata/hh93b5.zip
+#CODE BOOK:https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS1-RR/doc/DRU1195_4.zip
+
+#IFLS2
+#BOOK1-HOUSEHOLD COMSUMPTION:https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS2/data/stata/hh97b1.zip
+#BOOK2-HOUSEHOLD ECONOMY:https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS2/data/stata/hh97b2.zip
+#BOOK5-HOUSEHOLD KIDS:https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS2/data/stata/hh97b5.zip
+#CODE BOOK:https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS2/doc/volume5.zip
+
+
+## A.1 Download and install load packages
+install.packages('downloader')
+install.packages('foreign')
+install.packages('dplyr')
+install.packages('srvyr')
+install.packages('stringr')
+install.packages('R.utils')
+install.packages('ggplot2')
+
+library(foreign) #Imports dta files
+library(dplyr) #Data manipulation
+library(downloader) #Downloads files from the internet
+library(srvyr) #Survey
+library(stringr) #Manipulate
+library(R.utils) #gunzip
+library(ggplot2)
+
+## B.Download files
+## B.1 Download
+
+#IFLS1-BOOK-K-Household member ：BUKKSC1-SC17 ；
+#IFLS1-BOOK-K-area ：BUKKSC1-SC05；
+url1.k = "https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS1-RR/data/stata/hh93bk.zip"
+file_name = "hh93bk.zip"
+download.file(url1.k, file_name)
+unzip("hh93bk.zip")
+
+#IFLS1-BOOK1:expenditure on education 
+url1 = "https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS1-RR/data/stata/hh93b1.zip"
+file_name = "hh93b1.zip"
+download.file(url1, file_name)
+unzip("hh93b1.zip")
+
+#IFLS1-BOOK2:household income
+url2="https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS1-RR/data/stata/hh93b2.zip"
+file_name = "hh93b2.zip"
+download.file(url2, file_name)
+unzip("hh93b2.zip")
+
+#IFLS1-BOOK5:school attendance 
+url3="https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS1-RR/data/stata/hh93b5.zip"
+file_name = "hh93b5.zip"
+download.file(url3, file_name)
+unzip("hh93b5.zip")
+
+#IFLS1-BOOKCA
+url4="https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS1-RR/data/stata/hh93bca.zip"
+file_name = "hh93bca.zip"
+download.file(url4, file_name)
+unzip("hh93bca.zip")
+
+
+#IMPORT DATA 
+
+#IFLS1-BOOK-k-Household member ：BUKKSC1-SC17 ；
+#IFLS1-BOOK-K-area ：BUKKSC1-SC05；
+gunzip('BOOK-K/bukksc1.dta.gz', remove=TRUE)
+df_inf= read.dta("BOOK-K/bukksc1.dta")
+
+df_inf=df_inf %>% 
+  rename('HHmember' = 'sc17',
+         'Area' = 'sc05')
+
+df_inf %>% 
+  summary()
+
+#Import HH Gender data -BUKCCA1-CA05
+df_gender= read.dta("IFLS1/BOOKCA/bukcca2.dta")
+
+df_gender=df_gender %>% 
+  rename('gender' = 'ca05')
+  
+#Impost FAMILY EARNING——BUK2PH2-PH09r1(household income last year) 
+df_HHincome = read.dta("IFLS1/BOOK2/buk2ut1.dta")
+df_HHincome=df_HHincome %>% 
+  rename('HH_farm' = 'ut09b1')
+
+# HH:BUK2UT1-UT09B1; ASSEST:BUK2UT2 -UT14R1 
+df_HHincome2 = read.dta("IFLS1/BOOK2/buk2ut2.dta")
+df_HHincome2=df_HHincome2%>% 
+  rename('Assest_farm' = 'ut14r1')
+
+df_HHincome2 %>% 
+  filter(`Assest_farm`!= 'NA') %>% 
+  summarise(mean(`Assest_farm`))
+
+# HH_nf BUK2NT1-NT09B1
+df_HHincome_nf = read.dta("IFLS1/BOOK2/buk2nt1.dta")
+df_HHincome_nf=df_HHincome_nf%>% 
+  rename('hh_income_nf' = 'nt09b1')
+
+df_HHincome_nf%>%
+  filter(`hh_income_nf`!= 'NA') %>%
+  summarise(mean(`hh_income_nf`))
+
+#HH_nf BUK2NT2-NT14A+NT14R1 
+df_HH_assest_nf = read.dta("IFLS1/BOOK2/buk2nt2.dta")
+df_HH_assest_nf=df_HH_assest_nf%>% 
+  rename('hh_assest_nf' = 'nt14r1')
+
+# df_HH_assest_nf%>%
+  filter(`hh_assest_nf`!= 'NA') %>%
+  summarise(mean(`hh_assest_nf`))
+
+#merge income data
+df_HHincome = merge(df_HHincome, df_HHincome2, by = 'case')
+df_HHincome = merge(df_HHincome, df_HHincome_nf, by = 'case')
+df_HHincome = merge(df_HHincome, df_HH_assest_nf, by = 'case')
+
+df_HHincome = df_HHincome %>% 
+  select( 'case','HH_farm' ,'Assest_farm','hh_income_nf','hh_assest_nf')
+
+df_HHincome =df_HHincome %>% 
+  replace(is.na(.), 0) %>% 
+  mutate( total_income = HH_farm + Assest_farm + hh_income_nf + hh_assest_nf)
+
+#average HH faimly income-
+df_HHincome %>% 
+  summarise(mean(total_income))
+
+#HHincome per capital 
+df_inf=merge(df_HHincome, df_inf, by = 'case')
+
+df_inf = df_inf %>% 
+  filter(HHmember != 'NA') %>% 
+  mutate(per_capita_income= total_income / HHmember)
+
+#average per capital income：
+df_inf %>% 
+  summarise(mean(per_capita_income))
+  
+#CHILDREN EDUCATION—— BUK5DL1-DLA04-if children is in the school now?
+df_edu = read.dta("IFLS1/BOOK5/buk5dl1.dta") 
+
+df_edu = df_edu %>% 
+  mutate(attendance = as.numeric(dla04 ==1))
+
+
+#merge attendacne and area 
+
+df_by_area=merge(df_edu, df_inf, by='case')
+
+df_by_area = df_by_area %>% 
+  select('case', 'Area', 'attendance','HHmember','per_capita_income','total_income')
+
+df_by_area %>% 
+  filter(attendance != 'NA') %>% 
+  summarise(mean(attendance)) 
+
+#attendance rate without ”NA"
+df_by_area %>% 
+  replace(is.na(.), 0) %>% 
+  summarise(mean(attendance)) 
+
+##GAROUP BY AREA, education attendance.
+df_2= df_by_area %>% 
+  replace(is.na(.), 0) %>% 
+  group_by(Area) %>% 
+  summarise(mean(attendance)) 
+
+#merge income and education —— insignificant 
+
+df_reg=merge(df_HHincome, df_edu, by = 'case')
+
+df_by_area %>% 
+  filter(total_income != 'NA') %>% 
+  lm (attendance ~ total_income + per_capita_income + Area , data=df_by_area)
+
+output=lm (attendance ~ total_income + per_capita_income + Area , data=df_by_area)
+summary(output)
+
+HR=round(exp(coef(output)), 4)
+CI=round(exp(confint(output)), 4)
+P=round(coef(summary(output)), 4)
+colnames(CI)=c('lower','higher')
+df_output=as.data.frame(cbind(HR,CI,P))
+
+###end of 1993-1994
+
+##1997-1998
+
+## A.1 Download and install load packages
+install.packages('downloader')
+install.packages('foreign')
+install.packages('dplyr')
+install.packages('srvyr')
+install.packages('stringr')
+install.packages('ggplot2')
+
+library(foreign) #Imports dta files
+library(dplyr) #Data manipulation
+library(downloader) #Downloads files from the internet
+library(srvyr) #Survey
+library(stringr) #Manipulate
+library(ggplot2)
+
+#IFLS2
+#BOOKK-HOUSEHOLD area & gender：https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS2/data/stata/hh97bk.zip
+#BOOK1-HOUSEHOLD COMSUMPTION:https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS2/data/stata/hh97b1.zip
+#BOOK2-HOUSEHOLD ECONOMY:https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS2/data/stata/hh97b2.zip
+#BOOK5-HOUSEHOLD KIDS:https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS2/data/stata/hh97b5.zip
+#CODE BOOK:https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS2/doc/volume5.zip
+
+
+#IFLS2-BOOK1:
+url_2.1='https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS2/data/stata/hh97b1.zip'
+file_name = "hh97b1.zip"
+download.file(url_2.1, file_name)
+unzip("hh97b1.zip")
+
+url_2.2='https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS2/data/stata/hh97b2.zip'
+file_name = "hh97b2.zip"
+download.file(url_2.2, file_name)
+unzip("hh97b2.zip")
+
+url_2.5='https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS2/data/stata/hh97b5.zip'
+file_name = "hh97b5.zip"
+download.file(url_2.5, file_name)
+unzip("hh97b5.zip")
+
+url_2.k='https://smapp.rand.org/labor/family/software_and_data/FLS/IFLS/IFLS2/data/stata/hh97bk.zip'
+file_name = "hh97bk.zip"
+download.file(url_2.k, file_name)
+unzip("hh97bk.zip")
+
+
+#import data  hhmember_bk_ar00 hhsize
+
+df_inf1=read.dta("BOOKK/bk_ar0.dta")
+df_inf1 = df_inf1 %>% 
+  rename('hhmember'='hhsize')
+
+#import data area(SC05)
+df_inf2= read.dta("BOOKK/bk_sc.dta")
+df_inf2 = df_inf2 %>% 
+  rename('area'='sc05')
+
+
+#HH farm income & -b2_ut1-ut09
+df_HHincome2= read.dta("BOOK2/b2_ut1.dta")
+df_HHincome2 =df_HHincome2%>% 
+  rename('HHincome'='ut09')
+df_HHincome2 %>% 
+  filter(HHincome != 'NA') %>% 
+  summarise(mean(HHincome))
+
+#HH farm income-asset & b2_ut2-UT14 
+df_HHincome_assest= read.dta("BOOK2/b2_ut2.dta")
+df_HHincome_assest =df_HHincome_assest%>% 
+  rename('HH_assest'='ut14')
+
+#HH not farm income & b2_nt1-NT09
+df_HHincome_nf= read.dta("BOOK2/b2_nt1.dta")
+df_HHincome_nf =df_HHincome_nf %>% 
+  rename('HH_income_nf'='nt09')
+#check
+df_HHincome_nf%>% 
+  filter(HH_income_nf != 'NA') %>% 
+  summarise(mean(HH_income_nf))
+
+#HH not farm assest & b2_nt2-NT14
+df_HH_assest_nf= read.dta("BOOK2/b2_nt2.dta")
+df_HH_assest_nf =df_HH_assest_nf %>% 
+  rename('HH_assest_nf'='nt14')
+
+#HHincome-total
+df_total_inc=merge(df_HHincome2, df_HHincome_assest, by='hhid97')
+df_total_inc=merge(df_HHincome_nf, df_total_inc, by='hhid97')
+df_total_inc=merge(df_HH_assest_nf, df_total_inc, by='hhid97')
+
+df_total_inc= df_total_inc %>% 
+  select("hhid97","HHincome","HH_assest","HH_income_nf","HH_assest_nf")
+
+df_total_inc =df_total_inc%>% 
+  replace(is.na(.), 0) %>% 
+  mutate(total_income = HHincome + HH_assest + HH_income_nf + HH_assest_nf)
+
+#average HH income
+df_total_inc%>% 
+  summary()
+
+#merge income and hhmumber 
+df_total_inc=merge(df_total_inc, df_inf1, by= 'hhid97')
+
+df_total_inc =df_total_inc%>% 
+  mutate(per_capita_income=total_income/hhmember)
+
+#per capita income
+df_total_inc %>% 
+  summarise( mean(per_capita_income) )
+
+#HH education & - b5_dla1-dla07
+df_education= read.dta("BOOK5/b5_dla1.dta")
+
+df_education = df_education %>% 
+  mutate(attends = as.numeric(dla07== '1. Yes'))
+
+df_education %>% 
+  summary()
+
+df_education %>% 
+  replace(is.na(.), 0) %>% 
+  summarise(mean(attends)) 
+
+
+#by area
+df_education=merge(df_education, df_inf2, by= 'hhid97')
+
+df_edu= df_education %>% 
+  replace(is.na(.), 0) %>%
+  filter(area != 'NA') %>% 
+  group_by(area) %>% 
+  summarise(mean(attends)) 
+
+#regression between attends and income & education expenditure
+reg=merge(df_education, df_total_inc, by= 'hhid97')
+  
+lm (attends ~ per_capita_income + total_income + area, data=reg)
+
+output=lm(attends ~ per_capita_income + total_income + area, data=reg)
+summary(output)
+
+HR=round(exp(coef(output)), 4)
+CI=round(exp(confint(output)), 4)
+P=round(coef(summary(output)), 4)
+colnames(CI)=c('lower','higher')
+df_output=as.data.frame(cbind(HR,CI,P))
+
+qplot(attends, per_capita_income, data=reg )
+
+
+##end
